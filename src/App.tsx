@@ -45,9 +45,15 @@ function App() {
 
   const [newTask, setNewTask] = useState({title: '', description: ''});
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [newDescription, setNewDescription] = useState<{[key: number]: string}>({});
+  console.log(newDescription,'New Description');
 
   console.log(newTask,'Task')
   console.log(tasks,'Tasks List')
+
+  const handleNewDescriptionChange = (id: number,value: string) =>{
+    setNewDescription((prev)=>({...prev, [id]: value}));
+  }
 
   const handleSubmit =  async(e: ChangeEvent<HTMLFormElement>) =>{
     e.preventDefault();
@@ -60,6 +66,7 @@ function App() {
   }
    setNewTask({title: '', description: ''});
    console.log('Task added successfully');
+   fetchTasks();
   }
 
   const fetchTasks = async () =>{
@@ -70,6 +77,29 @@ function App() {
       return;
     }
     setTasks(data);
+  }
+
+  const deleteTask = async(id: number) =>{
+    const {error} = await supabase.from('tasks').delete().eq('id',id);
+
+    if(error){
+      console.log("Error deleting task: ", error.message);
+      return;
+    }
+    fetchTasks();
+    console.log('Task deleted successfully');
+  }
+
+  const updateTask = async(id: number)=>{
+    const {error} = await supabase.from('tasks').update({description: newDescription[id]}).eq('id',id);
+
+    if(error){
+      console.log("Error updating task: ", error.message);
+      return;
+    }
+    setNewDescription('');
+    fetchTasks();
+    console.log('Task updated successfully');
   }
 
   useEffect(()=>{
@@ -134,18 +164,19 @@ function App() {
               <img src={task.image_url} style={{ height: 70 }} />
               <div>
                 <textarea
+                  value={newDescription[task.id] || ''}
                   placeholder="Updated description..."
-                  // onChange={(e) => setNewDescription(e.target.value)}
+                  onChange={(e)=> handleNewDescriptionChange(task.id, e.target.value)}
                 />
                 <button
                   style={{ padding: "0.5rem 1rem", marginRight: "0.5rem" }}
-                  // onClick={() => updateTask(task.id)}
+                  onClick={() => updateTask(task.id)}
                 >
                   Edit
                 </button>
                 <button
                   style={{ padding: "0.5rem 1rem" }}
-                  // onClick={() => deleteTask(task.id)}
+                  onClick={() => deleteTask(task.id)}
                 >
                   Delete
                 </button>
