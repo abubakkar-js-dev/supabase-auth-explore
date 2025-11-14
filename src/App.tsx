@@ -80,7 +80,7 @@ function App() {
       {session ? (
         <>
         <button onClick={logout}>Log Out</button>
-        <TaskManager />
+        <TaskManager  session={session}/>
       
         </>
       ): (<Auth />)}

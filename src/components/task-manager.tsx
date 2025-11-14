@@ -10,8 +10,8 @@ interface Task {
   image_url: string;
 }
 
-function TaskManager({seassion}: {session: Session | null}) {
-  const [newTask, setNewTask] = useState({ title: "", description: "", email: ""});
+function TaskManager({session}: {session: Session | null}) {
+  const [newTask, setNewTask] = useState({ title: "", description: "", createdBy: ""});
   const [tasks, setTasks] = useState<Task[]>([]);
   const [newDescription, setNewDescription] = useState<{
     [key: number]: string;
@@ -20,6 +20,7 @@ function TaskManager({seassion}: {session: Session | null}) {
 
   console.log(newTask, "Task");
   console.log(tasks, "Tasks List");
+  console.log('User Email:', session?.user.email);
 
   const handleNewDescriptionChange = (id: number, value: string) => {
     setNewDescription((prev) => ({ ...prev, [id]: value }));
@@ -28,7 +29,7 @@ function TaskManager({seassion}: {session: Session | null}) {
   const handleSubmit = async (e: ChangeEvent<HTMLFormElement>) => {
     e.preventDefault();
 
-    const task = {...newTask, email: seassion?.user.email};
+    const task = {...newTask, createdBy: session?.user.email};
 
     const { error } = await supabase.from("tasks").insert(task).single();
 
@@ -36,7 +37,7 @@ function TaskManager({seassion}: {session: Session | null}) {
       console.error("Error adding task: ", error.message);
       return;
     }
-    setNewTask({ title: "", description: "", email: ""});
+    setNewTask({ title: "", description: "", createdBy: ""});
     console.log("Task added successfully");
     fetchTasks();
   };
