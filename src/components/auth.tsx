@@ -6,29 +6,25 @@ export const Auth = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
-  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>)=>{
     e.preventDefault();
+    
+    if(isSignUp){
+      const {error: signUpError} = await supabase.auth.signUp({email,password});
 
-    if (isSignUp) {
-      const { error: signUpError } = await supabase.auth.signUp({
-        email,
-        password,
-      });
-      if (signUpError) {
-        console.error("Error signing up:", signUpError.message);
+      if(signUpError){
+        console.log("Error signing up:", signUpError.message);
         return;
       }
-    } else {
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-      if (signInError) {
-        console.error("Error signing up:", signInError.message);
+    }else{
+      const {error: signInError} = await supabase.auth.signInWithPassword({email,password});
+
+      if(signInError){
+        console.log("Error signing in:", signInError.message);
         return;
       }
     }
-  };
+  } 
 
   return (
     <div style={{ maxWidth: "400px", margin: "0 auto", padding: "1rem" }}>

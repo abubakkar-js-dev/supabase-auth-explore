@@ -3,17 +3,13 @@ import "./App.css";
 import { Auth } from "./components/auth";
 import TaskManager from "./components/task-manager";
 import { supabase } from "./supabase-client";
+import type { Session } from "@supabase/supabase-js";
 
-interface Task {
-  id: number,
-  title: string,
-  description: string,
-  created_at: string,
-  image_url: string
-}
+
 
 function App() {
   // const [session, setSession] = useState<any>(null);
+
 
   // const fetchSession = async () => {
   //   const currentSession = await supabase.auth.getSession();
@@ -39,72 +35,36 @@ function App() {
   //   await supabase.auth.signOut();
   // };
 
+  const [session, setSession] = useState<Session | null>(null);
 
 
-  /// start 
-
-  const [newTask, setNewTask] = useState({title: '', description: ''});
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [newDescription, setNewDescription] = useState<{[key: number]: string}>({});
-  console.log(newDescription,'New Description');
-
-  console.log(newTask,'Task')
-  console.log(tasks,'Tasks List')
-
-  const handleNewDescriptionChange = (id: number,value: string) =>{
-    setNewDescription((prev)=>({...prev, [id]: value}));
+  const fetchSession = async ():Promise<void>=>{
+    const currectSession = await supabase.auth.getSession();
+    setSession(currectSession.data.session);
   }
 
-  const handleSubmit =  async(e: ChangeEvent<HTMLFormElement>) =>{
-    e.preventDefault();
-
-  const {error} =   await supabase.from('tasks').insert(newTask).single();
-
-  if(error){
-    console.error("Error adding task: ", error.message);
-    return;
-  }
-   setNewTask({title: '', description: ''});
-   console.log('Task added successfully');
-   fetchTasks();
-  }
-
-  const fetchTasks = async () =>{
-    const {data,error} = await supabase.from('tasks').select('*').order('created_at',{ascending: false});
-
-    if(error){
-      console.log("Error fetching tasks: ", error.message);
-      return;
-    }
-    setTasks(data);
-  }
-
-  const deleteTask = async(id: number) =>{
-    const {error} = await supabase.from('tasks').delete().eq('id',id);
-
-    if(error){
-      console.log("Error deleting task: ", error.message);
-      return;
-    }
-    fetchTasks();
-    console.log('Task deleted successfully');
-  }
-
-  const updateTask = async(id: number)=>{
-    const {error} = await supabase.from('tasks').update({description: newDescription[id]}).eq('id',id);
-
-    if(error){
-      console.log("Error updating task: ", error.message);
-      return;
-    }
-    setNewDescription('');
-    fetchTasks();
-    console.log('Task updated successfully');
+  const logout = async ():Promise<void>=>{
+     await supabase.auth.signOut();
+     setSession(null);
   }
 
   useEffect(()=>{
-    fetchTasks();
-  },[]);
+    fetchSession();
+
+    const {data: authListener} = supabase.auth.onAuthStateChange((_event,session)=>{
+      setSession(session);
+    })
+
+    return ()=>{
+      authListener.subscription.unsubscribe();
+    }
+
+  },[])
+
+  console.log(session, "Session in App.tsx");
+
+
+
 
 
   return (
@@ -117,75 +77,14 @@ function App() {
       ) : (
         <Auth />
       )} */}
+      {session ? (
+        <>
+        <button onClick={logout}>Log Out</button>
+        <TaskManager />
+      
+        </>
+      ): (<Auth />)}
 
-
-
-       <div style={{ maxWidth: "600px", margin: "0 auto", padding: "1rem" }}>
-      <h2>Task Manager CRUD</h2>
-
-      {/* Form to add a new task */}
-      <form onSubmit={handleSubmit} style={{ marginBottom: "1rem" }}>
-        <input
-          type="text"
-          placeholder="Task Title"
-          required
-          onChange={(e)=> setNewTask((prev)=>({...prev, title: e.target.value}))}
-          style={{ width: "100%", marginBottom: "0.5rem", padding: "0.5rem" }}
-        />
-        <textarea
-          placeholder="Task Description"
-          required
-          onChange={(e)=> setNewTask((prev)=>({...prev, description: e.target.value}))}
-          style={{ width: "100%", marginBottom: "0.5rem", padding: "0.5rem" }}
-        />
-
-        {/* <input type="file" accept="image/*" onChange={handleFileChange} /> */}
-
-        <button type="submit" style={{ padding: "0.5rem 1rem" }}>
-          Add Task
-        </button>
-      </form>
-
-      {/* List of Tasks */}
-      <ul style={{ listStyle: "none", padding: 0 }}>
-        {tasks.map((task, key) => (
-          <li
-            key={key}
-            style={{
-              border: "1px solid #ccc",
-              borderRadius: "4px",
-              padding: "1rem",
-              marginBottom: "0.5rem",
-            }}
-          >
-            <div>
-              <h3>{task.title}</h3>
-              <p>{task.description}</p>
-              <img src={task.image_url} style={{ height: 70 }} />
-              <div>
-                <textarea
-                  value={newDescription[task.id] || ''}
-                  placeholder="Updated description..."
-                  onChange={(e)=> handleNewDescriptionChange(task.id, e.target.value)}
-                />
-                <button
-                  style={{ padding: "0.5rem 1rem", marginRight: "0.5rem" }}
-                  onClick={() => updateTask(task.id)}
-                >
-                  Edit
-                </button>
-                <button
-                  style={{ padding: "0.5rem 1rem" }}
-                  onClick={() => deleteTask(task.id)}
-                >
-                  Delete
-                </button>
-              </div>
-            </div>
-          </li>
-        ))}
-      </ul>
-    </div>
     </>
   );
 }

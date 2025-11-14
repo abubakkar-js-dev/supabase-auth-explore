@@ -10,24 +10,47 @@ interface Task {
   image_url: string;
 }
 
-function TaskManager({ session }: { session: Session }) {
-  const [newTask, setNewTask] = useState({ title: "", description: "" });
+function TaskManager({seassion}: {session: Session | null}) {
+  const [newTask, setNewTask] = useState({ title: "", description: "", email: ""});
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [newDescription, setNewDescription] = useState("");
+  const [newDescription, setNewDescription] = useState<{
+    [key: number]: string;
+  }>({});
+  console.log(newDescription, "New Description");
 
-  const [taskImage, setTaskImage] = useState<File | null>(null);
+  console.log(newTask, "Task");
+  console.log(tasks, "Tasks List");
 
-  const fetchTasks = async () => {
-    const { error, data } = await supabase
-      .from("tasks")
-      .select("*")
-      .order("created_at", { ascending: true });
+  const handleNewDescriptionChange = (id: number, value: string) => {
+    setNewDescription((prev) => ({ ...prev, [id]: value }));
+  };
+
+  const handleSubmit = async (e: ChangeEvent<HTMLFormElement>) => {
+    e.preventDefault();
+
+    const task = {...newTask, email: seassion?.user.email};
+
+    const { error } = await supabase.from("tasks").insert(task).single();
 
     if (error) {
-      console.error("Error reading task: ", error.message);
+      console.error("Error adding task: ", error.message);
       return;
     }
+    setNewTask({ title: "", description: "", email: ""});
+    console.log("Task added successfully");
+    fetchTasks();
+  };
 
+  const fetchTasks = async () => {
+    const { data, error } = await supabase
+      .from("tasks")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.log("Error fetching tasks: ", error.message);
+      return;
+    }
     setTasks(data);
   };
 
@@ -35,91 +58,31 @@ function TaskManager({ session }: { session: Session }) {
     const { error } = await supabase.from("tasks").delete().eq("id", id);
 
     if (error) {
-      console.error("Error deleting task: ", error.message);
+      console.log("Error deleting task: ", error.message);
       return;
     }
+    fetchTasks();
+    console.log("Task deleted successfully");
   };
 
   const updateTask = async (id: number) => {
     const { error } = await supabase
       .from("tasks")
-      .update({ description: newDescription })
+      .update({ description: newDescription[id] })
       .eq("id", id);
 
     if (error) {
-      console.error("Error updating task: ", error.message);
+      console.log("Error updating task: ", error.message);
       return;
     }
-  };
-
-  const uploadImage = async (file: File): Promise<string | null> => {
-    const filePath = `${file.name}-${Date.now()}`;
-
-    const { error } = await supabase.storage
-      .from("tasks-images")
-      .upload(filePath, file);
-
-    if (error) {
-      console.error("Error uploading image:", error.message);
-      return null;
-    }
-
-    const { data } = await supabase.storage
-      .from("tasks-images")
-      .getPublicUrl(filePath);
-
-    return data.publicUrl;
-  };
-
-  const handleSubmit = async (e: any) => {
-    e.preventDefault();
-
-    let imageUrl: string | null = null;
-    if (taskImage) {
-      imageUrl = await uploadImage(taskImage);
-    }
-
-    const { error } = await supabase
-      .from("tasks")
-      .insert({ ...newTask, email: session.user.email, image_url: imageUrl })
-      .select()
-      .single();
-
-    if (error) {
-      console.error("Error adding task: ", error.message);
-      return;
-    }
-
-    setNewTask({ title: "", description: "" });
-  };
-
-  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      setTaskImage(e.target.files[0]);
-    }
+    setNewDescription("");
+    fetchTasks();
+    console.log("Task updated successfully");
   };
 
   useEffect(() => {
     fetchTasks();
   }, []);
-
-  useEffect(() => {
-    const channel = supabase.channel("tasks-channel");
-    channel
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "tasks" },
-        (payload) => {
-          const newTask = payload.new as Task;
-          setTasks((prev) => [...prev, newTask]);
-        }
-      )
-      .subscribe((status) => {
-        console.log("Subscription: ", status);
-      });
-  }, []);
-
-  console.log(tasks);
 
   return (
     <div style={{ maxWidth: "600px", margin: "0 auto", padding: "1rem" }}>
@@ -130,6 +93,7 @@ function TaskManager({ session }: { session: Session }) {
         <input
           type="text"
           placeholder="Task Title"
+          required
           onChange={(e) =>
             setNewTask((prev) => ({ ...prev, title: e.target.value }))
           }
@@ -137,13 +101,14 @@ function TaskManager({ session }: { session: Session }) {
         />
         <textarea
           placeholder="Task Description"
+          required
           onChange={(e) =>
             setNewTask((prev) => ({ ...prev, description: e.target.value }))
           }
           style={{ width: "100%", marginBottom: "0.5rem", padding: "0.5rem" }}
         />
 
-        <input type="file" accept="image/*" onChange={handleFileChange} />
+        {/* <input type="file" accept="image/*" onChange={handleFileChange} /> */}
 
         <button type="submit" style={{ padding: "0.5rem 1rem" }}>
           Add Task
@@ -168,8 +133,11 @@ function TaskManager({ session }: { session: Session }) {
               <img src={task.image_url} style={{ height: 70 }} />
               <div>
                 <textarea
+                  value={newDescription[task.id] || ""}
                   placeholder="Updated description..."
-                  onChange={(e) => setNewDescription(e.target.value)}
+                  onChange={(e) =>
+                    handleNewDescriptionChange(task.id, e.target.value)
+                  }
                 />
                 <button
                   style={{ padding: "0.5rem 1rem", marginRight: "0.5rem" }}
