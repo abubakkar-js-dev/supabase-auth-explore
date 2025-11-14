@@ -10,17 +10,21 @@ interface Task {
   image_url: string;
 }
 
-function TaskManager({session}: {session: Session | null}) {
-  const [newTask, setNewTask] = useState({ title: "", description: "", createdBy: ""});
+function TaskManager({ session }: { session: Session | null }) {
+  const [newTask, setNewTask] = useState({
+    title: "",
+    description: "",
+    created_by: "",
+  });
   const [tasks, setTasks] = useState<Task[]>([]);
   const [newDescription, setNewDescription] = useState<{
     [key: number]: string;
   }>({});
-  console.log(newDescription, "New Description");
+  // console.log(newDescription, "New Description");
 
-  console.log(newTask, "Task");
-  console.log(tasks, "Tasks List");
-  console.log('User Email:', session?.user.email);
+  // console.log(newTask, "Task");
+  // console.log(tasks, "Tasks List");
+  // console.log('User Email:', session?.user.email);
 
   const handleNewDescriptionChange = (id: number, value: string) => {
     setNewDescription((prev) => ({ ...prev, [id]: value }));
@@ -29,7 +33,7 @@ function TaskManager({session}: {session: Session | null}) {
   const handleSubmit = async (e: ChangeEvent<HTMLFormElement>) => {
     e.preventDefault();
 
-    const task = {...newTask, createdBy: session?.user.email};
+    const task = { ...newTask, created_by: session?.user.email };
 
     const { error } = await supabase.from("tasks").insert(task).single();
 
@@ -37,7 +41,7 @@ function TaskManager({session}: {session: Session | null}) {
       console.error("Error adding task: ", error.message);
       return;
     }
-    setNewTask({ title: "", description: "", createdBy: ""});
+    setNewTask({ title: "", description: "", created_by: "" });
     console.log("Task added successfully");
     fetchTasks();
   };
@@ -76,13 +80,33 @@ function TaskManager({session}: {session: Session | null}) {
       console.log("Error updating task: ", error.message);
       return;
     }
-    setNewDescription("");
+    setNewDescription({});
     fetchTasks();
     console.log("Task updated successfully");
   };
 
   useEffect(() => {
     fetchTasks();
+  }, []);
+
+  useEffect(() => {
+    const channel = supabase.channel("task-channel");
+
+    channel
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "tasks" },
+        (payload) => {
+          const newTask = payload.new as Task;
+          setTasks((prev) => [...prev, newTask]);
+          // fetchTasks();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   return (
