@@ -20,6 +20,8 @@ function TaskManager({ session }: { session: Session | null }) {
   const [newDescription, setNewDescription] = useState<{
     [key: number]: string;
   }>({});
+
+  const [taskImage, setTaskImage] = useState<File | null >(null)
   // console.log(newDescription, "New Description");
 
   // console.log(newTask, "Task");
@@ -30,10 +32,30 @@ function TaskManager({ session }: { session: Session | null }) {
     setNewDescription((prev) => ({ ...prev, [id]: value }));
   };
 
+  const uploadImage = async (file: File): Promise<string | null> => {
+    const fileName = `${Date.now()}_${file.name}`;
+    const {error} = await supabase.storage.from('tasks-images').upload(fileName, file);
+
+    if(error){
+      console.error("Error uploading image: ", error.message);
+      return null;
+    }
+
+    const {data} = supabase.storage.from('tasks-images').getPublicUrl(fileName);
+
+    return data.publicUrl;
+  }
+
   const handleSubmit = async (e: ChangeEvent<HTMLFormElement>) => {
     e.preventDefault();
 
-    const task = { ...newTask, created_by: session?.user.email };
+    let imageUrl: string | null = null;
+
+    if(taskImage){
+      imageUrl = await uploadImage(taskImage);
+    }
+
+    const task = { ...newTask, created_by: session?.user.email, image_url: imageUrl };
 
     const { error } = await supabase.from("tasks").insert(task).single();
 
@@ -85,6 +107,15 @@ function TaskManager({ session }: { session: Session | null }) {
     console.log("Task updated successfully");
   };
 
+  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) =>{
+    const files = e.target.files;
+    if(files && files.length > 0){
+      setTaskImage(files[0]);
+    }else{
+      setTaskImage(null);
+    }
+  }
+
   useEffect(() => {
     fetchTasks();
   }, []);
@@ -133,7 +164,7 @@ function TaskManager({ session }: { session: Session | null }) {
           style={{ width: "100%", marginBottom: "0.5rem", padding: "0.5rem" }}
         />
 
-        {/* <input type="file" accept="image/*" onChange={handleFileChange} /> */}
+        <input type="file" accept="image/*" onChange={handleFileChange} />
 
         <button type="submit" style={{ padding: "0.5rem 1rem" }}>
           Add Task
